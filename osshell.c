@@ -62,7 +62,20 @@ char** read_input()
 {
 	//read the whole command
 	char cmd[255];
-	fgets(cmd, 255, stdin);
+	if(!fgets(cmd, 255, stdin))
+	{
+		//EOF is read
+		printf("\n");
+		exit(0);
+	}
+
+	if(strlen(cmd) == 1)
+	{
+		//empty string
+		return NULL;
+	}
+	
+
 	cmd[strlen(cmd)-1] = '\0';
 
 	//tokenize
@@ -126,8 +139,12 @@ int main(int argc, char *argv[])
 
 		char** argList = read_input();
 
-		if(check_builtin(argList) == 0)
-			execution(argList);
+		if(argList) //if argList not empty
+		{
+			if(check_builtin(argList) == 0)
+				execution(argList);
+		}
+		
 	}
 
 	return 0;
