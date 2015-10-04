@@ -46,7 +46,7 @@ int check_builtin(char** argList)
 			}
 			else
 			{
-				printf("Cannot Change Directory\n");
+				printf("%s: Cannot Change Directory\n", argList[1]);
 			}
 		}		
 		
@@ -109,9 +109,9 @@ int execution(char** argList)
 		setenv("PATH","/bin:/usr/bin:.",1);
 		execvp(*argList,argList);
 		if(errno == ENOENT){
-			printf("[%s]: command not found\n", argList[0]);
+			printf("%s: command not found\n", argList[0]);
 		} else {
-			printf("[%s]: unknown error\n", argList[0]);
+			printf("%s: unknown error\n", argList[0]);
 		}
 		exit(0);
 	}
