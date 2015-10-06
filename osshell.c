@@ -4,8 +4,20 @@
 #include <unistd.h> // Needed by getcwd(),execvp
 #include <string.h> // Needed by strtok()
 #include <errno.h>
+#include <sys/wait.h> // Needed by waitpid()
+#include <sys/types.h> // Needed by waitpid()
 
 char cwd[PATH_MAX+1];
+
+int free_mem(char** argList)
+{
+	int i = 0;
+	while(argList[i])
+		free(argList[i++]);
+
+	free(argList);
+	return 0;
+}
 
 int print_header()
 {
@@ -34,8 +46,9 @@ int check_builtin(char** argList)
 
 	if(strcmp(argList[0],"cd") == 0)
 	{
-		if(argList[2] != NULL)
+		if(argList[2] != NULL || argList[1] == NULL)
 		{
+			//only 2 args (<2 or >2)
 			printf("cd: wrong number of arguments\n");
 		}
 		else
@@ -61,17 +74,17 @@ int check_builtin(char** argList)
 char** read_input()
 {
 	//read the whole command
-	char cmd[255];
-	if(!fgets(cmd, 255, stdin))
+	char cmd[256];
+	if(!fgets(cmd, 256, stdin))
 	{
 		//EOF is read
 		printf("\n");
 		exit(0);
 	}
 
-	if(strlen(cmd) == 1)
+	if(strlen(cmd) == 1 || cmd[0] == ' ')
 	{
-		//empty string
+		//empty string OR a space is read
 		return NULL;
 	}
 	
@@ -79,13 +92,13 @@ char** read_input()
 	cmd[strlen(cmd)-1] = '\0';
 
 	//tokenize
-	char **argList = (char**) malloc(sizeof(char*) * 128); //255/2
+	char **argList = (char**) malloc(sizeof(char*) * 129); //255/2
 
 	char *token = strtok(cmd," ");
 	int i = 0;
 	while(token != NULL)
 	{
-		argList[i] = (char*)malloc(sizeof(char) * strlen(token+1));
+		argList[i] = (char*)malloc(sizeof(char) * (strlen(token) + 1));
 		strcpy(argList[i++],token);
 		token = strtok(NULL," ");
 	}
@@ -97,10 +110,11 @@ char** read_input()
 
 int execution(char** argList)
 {
-	if(fork())
+	pid_t child_pid;
+	if((child_pid = fork()))
 	{
 		//parent
-		wait();
+		waitpid(child_pid,NULL,WUNTRACED);
 		free_mem(argList);
 	}
 	else
@@ -113,21 +127,13 @@ int execution(char** argList)
 		} else {
 			printf("%s: unknown error\n", argList[0]);
 		}
+		free_mem(argList);
 		exit(0);
 	}
 	return 0;
 }
 
 
-int free_mem(char** argList)
-{
-	int i = 0;
-	while(argList[i])
-		free(argList[i++]);
-
-	free(argList);
-	return 0;
-}
 
 
 int main(int argc, char *argv[])
