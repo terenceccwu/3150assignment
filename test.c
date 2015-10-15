@@ -14,7 +14,7 @@ int print(glob_t* myresult)
 
 int main()
 {
-	const char* pa1 = "./3150assignment/*";
+	const char* pa1 = "./*";
 	const char* pa2 = "asdf";
 
 	glob_t* result = malloc(sizeof(glob_t));

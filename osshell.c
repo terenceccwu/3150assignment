@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <sys/wait.h> // Needed by waitpid()
 #include <sys/types.h> // Needed by waitpid()
+#include <glob.h>
 
 char cwd[PATH_MAX+1];
 
@@ -92,14 +93,34 @@ char** read_input()
 	cmd[strlen(cmd)-1] = '\0';
 
 	//tokenize
-	char **argList = (char**) malloc(sizeof(char*) * 129); //255/2
+	int max_arg = 128; //255/2
+	char **argList = (char**) malloc(sizeof(char*) * (max_arg + 1)); // +1 for the final NULL char
 
 	char *token = strtok(cmd," ");
 	int i = 0;
 	while(token != NULL)
 	{
-		argList[i] = (char*)malloc(sizeof(char) * (strlen(token) + 1));
-		strcpy(argList[i++],token);
+		//wildcard expansion
+		if(strstr(token,"*")) //if token contains *
+		{
+			glob_t result;
+			glob(token, GLOB_NOCHECK, NULL, &result);
+			int j;
+			for(j = 0; j < result.gl_pathc; j++)
+			{
+				char* next = result.gl_pathv[j];
+				argList[i] = (char*)malloc(sizeof(char) * (strlen(next) + 1));
+				strcpy(argList[i++], next);
+			}
+			globfree(&result);
+
+		}
+		else //normal copying
+		{
+			argList[i] = (char*)malloc(sizeof(char) * (strlen(token) + 1));
+			strcpy(argList[i++],token);
+		}
+
 		token = strtok(NULL," ");
 	}
 
