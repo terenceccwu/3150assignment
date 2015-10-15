@@ -1,1 +1,3 @@
-# 3150assignment
+3150assignment
+====
+* Don't add binaries to the repository
