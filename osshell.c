@@ -7,6 +7,7 @@
 #include <sys/wait.h> // Needed by waitpid()
 #include <sys/types.h> // Needed by waitpid()
 #include <glob.h>
+#include <signal.h>
 
 char cwd[PATH_MAX+1];
 
@@ -135,12 +136,23 @@ int execution(char** argList)
 	if((child_pid = fork()))
 	{
 		//parent
-		waitpid(child_pid,NULL,WUNTRACED);
+		int child_status;
+		waitpid(child_pid, &child_status,WUNTRACED);
+
+		//detect child signal that causes termination
+		if(WIFSIGNALED(child_status) || WIFSTOPPED(child_status))
+			printf("\n");
+
 		free_mem(argList);
 	}
 	else
 	{
 		//child
+		signal(SIGINT, SIG_DFL); // ctrl-c
+		signal(SIGTERM, SIG_DFL); // kill
+		signal(SIGQUIT, SIG_DFL); // ctrl- backlash
+		signal(SIGTSTP, SIG_DFL); // ctrl-z
+
 		setenv("PATH","/bin:/usr/bin:.",1);
 		execvp(*argList,argList);
 		if(errno == ENOENT){
@@ -159,7 +171,11 @@ int execution(char** argList)
 
 int main(int argc, char *argv[])
 {
-	
+	signal(SIGINT, SIG_IGN); // ctrl-c
+	signal(SIGTERM, SIG_IGN); // kill
+	signal(SIGQUIT, SIG_IGN); // ctrl- backslash
+	signal(SIGTSTP, SIG_IGN); // ctrl-z
+
 	while(1)
 	{
 		print_header();
