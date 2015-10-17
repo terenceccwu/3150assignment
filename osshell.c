@@ -132,6 +132,24 @@ char** read_input()
 
 int execution(char** argList)
 {
+	signal(SIGINT, SIG_DFL); // ctrl-c
+	signal(SIGTERM, SIG_DFL); // kill
+	signal(SIGQUIT, SIG_DFL); // ctrl- backlash
+	signal(SIGTSTP, SIG_DFL); // ctrl-z
+
+	setenv("PATH","/bin:/usr/bin:.",1);
+	execvp(*argList,argList);
+	if(errno == ENOENT){
+		printf("%s: command not found\n", argList[0]);
+	} else {
+		printf("%s: unknown error\n", argList[0]);
+	}
+	free_mem(argList);
+	exit(0);
+}
+
+int single_cmd(char** argList)
+{
 	pid_t child_pid;
 	if((child_pid = fork()))
 	{
@@ -148,20 +166,7 @@ int execution(char** argList)
 	else
 	{
 		//child
-		signal(SIGINT, SIG_DFL); // ctrl-c
-		signal(SIGTERM, SIG_DFL); // kill
-		signal(SIGQUIT, SIG_DFL); // ctrl- backlash
-		signal(SIGTSTP, SIG_DFL); // ctrl-z
-
-		setenv("PATH","/bin:/usr/bin:.",1);
-		execvp(*argList,argList);
-		if(errno == ENOENT){
-			printf("%s: command not found\n", argList[0]);
-		} else {
-			printf("%s: unknown error\n", argList[0]);
-		}
-		free_mem(argList);
-		exit(0);
+		execution(argList);
 	}
 	return 0;
 }
@@ -185,7 +190,7 @@ int main(int argc, char *argv[])
 		if(argList) //if argList not empty
 		{
 			if(check_builtin(argList) == 0)
-				execution(argList);
+				single_cmd(argList);
 		}
 		
 	}
