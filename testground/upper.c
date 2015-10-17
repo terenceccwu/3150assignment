@@ -2,7 +2,6 @@
 #include <unistd.h>
 int main()	
 {
-	sleep(2);
 	char c;
 	while((c = getchar()))
 	{
