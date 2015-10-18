@@ -54,7 +54,7 @@ int manage_pipes(int fd[][2], int p, int num)
 int main(int argc, char *argv[]){
 	signal(SIGCHLD, signal_handle);
 
-	int num = 3;
+	int num = 10;
 
 	//create an array of pipes
 	int pipefd[num-1][2]; //0 to (num-2) pipes
@@ -62,10 +62,30 @@ int main(int argc, char *argv[]){
 	for(k=0;k<num-1;k++)
 		pipe(pipefd[k]);
 
+	//save a copy of stdin & stdout
+	int stdin_copy = dup(0);
+	int stdout_copy = dup(1);
 
-	char *leftSeg[2] = {"ls", NULL};
-	char *midSeg[2] = {"cat", NULL};
-	char *rightSeg[2] = {"./upper", NULL};
+	// char *leftSeg[2] = {"fa", NULL};
+	// char *midSeg[2] = {"fa", NULL};
+	// char *rightSeg[2] = {"ls", NULL};
+	
+	char*** L_argList = malloc(sizeof(char**) * 10);
+
+	int y;
+	for(y=0;y<10;y++)
+	{
+		L_argList[y] = malloc(sizeof(char*) * 3);
+		L_argList[y][0] = "cat";
+		L_argList[y][1] = NULL;
+	}
+
+	L_argList[0][0] = "ls";
+	L_argList[0][1] = "/";
+	L_argList[0][2] = NULL;
+	L_argList[5][0] = "./upper";
+
+	L_argList[7][0] = "asdf";	
 	
 
 	int i;
@@ -77,18 +97,18 @@ int main(int argc, char *argv[]){
 			//child
 			printf("  child: %d is created\n", getpid());
 			manage_pipes(pipefd,i,num); //all children will be handled
-			if(i==0) //first process
-			{
-				execvp(*leftSeg, leftSeg);
+
+			setenv("PATH","/bin:/usr/bin:.",1);
+			execvp(*L_argList[i], L_argList[i]);
+			//if error
+			dup2(stdout_copy,1); //reset stdout to screen
+
+			if(errno == ENOENT){
+				printf("%s: command not found\n", L_argList[i][0]);
+			} else {
+				printf("%s: unknown error\n", L_argList[i][0]);
 			}
-			else if(i == num - 1) //last process
-			{
-				execvp(*rightSeg, rightSeg);
-			}
-			else //middle process
-			{
-				execvp(*midSeg, midSeg);
-			}
+			exit(0);
 
 			break; //child does not loop
 		}
@@ -113,6 +133,5 @@ int main(int argc, char *argv[]){
     		}
 		}
 	}
-
 	return 0;
 }

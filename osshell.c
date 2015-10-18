@@ -47,10 +47,12 @@ int rm_jobs(int job_no)
 {
 	if(job_no == 1)
 	{
+		printf("success\n");
 		Jobs* oldHead = *jobList;
 		*jobList = oldHead->next;
 		free(oldHead->pidList);
 		free(oldHead);
+
 		return 0;
 	}
 	
@@ -95,6 +97,7 @@ int wait_child(pid_t* child_pid, char cmd[], int num)
 	int j;
 	for(j=0;j<num;j++)
 	{
+		printf("--%d\n", j);
 		int child_status;
 		waitpid(-1,&child_status,WUNTRACED);
 
@@ -108,6 +111,7 @@ int wait_child(pid_t* child_pid, char cmd[], int num)
 		if(WIFSTOPPED(child_status)) //ctrl-z
 		{
 			add_jobs(cmd,child_pid);
+			printf("\n");
 			break;
 		}
 	}
@@ -123,6 +127,7 @@ int wake_child(int job_no)
 	char cmd[255];
 
 	int i = 1;
+
 	while(i<job_no)
 	{
 		temp = temp->next;
@@ -140,6 +145,7 @@ int wake_child(int job_no)
 	}
 
 	rm_jobs(job_no);
+	printf("hihihi\n");
 	wait_child(pidList, cmd, i);
 
 	
@@ -207,8 +213,24 @@ int check_builtin(char*** L_argList)
 
 	if(strcmp(argList[0],"fg") == 0)
 	{
+		if(argList[1] == NULL){
+			return -1;
+		}
 		int job_no = atoi(argList[1]);
-		wake_child(job_no);
+		
+		int num = 0;
+
+		Jobs* temp = *jobList;
+		while(temp){
+			temp = temp->next;
+			num++;
+		}
+
+		printf("%d, %d\n", job_no, num);
+		if(job_no > 0 && job_no <= num)
+			wake_child(job_no);
+		else
+			printf("fg: no such job\n");
 		return 1;
 	}
 
