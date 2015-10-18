@@ -9,9 +9,29 @@
 #include <glob.h>
 #include <signal.h>
 
+typedef struct jobs {
+	char cmd[255];
+	pid_t *pidList;
+	struct jobs *next;
+} Jobs;
+
 char cwd[PATH_MAX+1];
 
-int free_mem(char*** L_argList)
+int create_jobs(char cmd[], pid_t* pidList)
+{
+	Jobs* newNode = malloc(sizeof(Jobs));
+	strcpy(newNode->cmd,cmd);
+	newNode->pidList = pidList;
+	newNode->next = NULL;
+	return 0;
+}
+
+int add_jobs(Jobs** jobList, char cmd[], pid_t* pidList)
+{
+	
+}
+
+int free_L_argList(char*** L_argList)
 {
 	int i = 0;
 	while(L_argList[i])
@@ -43,12 +63,12 @@ int check_builtin(char*** L_argList)
 		if(argList[1] != NULL)
 		{
 			printf("exit: wrong number of arguments\n");
-			free_mem(L_argList);
+			free_L_argList(L_argList);
 			return 1;
 		}
 		
 
-		free_mem(L_argList);
+		free_L_argList(L_argList);
 		exit(0);
 	}
 
@@ -71,7 +91,7 @@ int check_builtin(char*** L_argList)
 			}
 		}		
 		
-		free_mem(L_argList);
+		free_L_argList(L_argList);
 		return 1;
 
 	}
@@ -79,10 +99,10 @@ int check_builtin(char*** L_argList)
 	return 0; //not a builtin function
 }
 
-char*** read_input()
+char*** read_input(char cmd[])
 {
 	//read the whole command
-	char cmd[256];
+	
 	if(!fgets(cmd, 256, stdin))
 	{
 		//EOF is read
@@ -195,7 +215,7 @@ int execution(char*** L_argList, int p_num, int stdout_copy)
 	} else {
 		printf("%s: unknown error\n", argList[0]);
 	}
-	free_mem(L_argList);
+	free_L_argList(L_argList);
 	exit(0);
 }
 
@@ -209,10 +229,20 @@ int single_cmd(char*** L_argList)
 		waitpid(child_pid, &child_status,WUNTRACED);
 
 		//detect child signal that causes termination
-		if(WIFSIGNALED(child_status) || WIFSTOPPED(child_status))
+		if(WIFSIGNALED(child_status)) // ctrl-c
 			printf("\n");
 
-		free_mem(L_argList);
+		if(WIFSTOPPED(child_status))
+		{
+			printf("\nWake it up?\n");
+			while(getchar() != 'y');
+			printf("Waking up cat YEAH\n");
+			kill(child_pid,SIGCONT);
+			waitpid(child_pid,NULL,WUNTRACED);
+			printf("end\n");
+		}
+
+		free_L_argList(L_argList);
 	}
 	else
 	{
@@ -310,8 +340,11 @@ int pipe_cmd(char*** L_argList)
 					printf("  process %d terminated\n", j);
 				}
     		}
+
 		}
 	}
+
+	free_L_argList(L_argList);
 	return 0;
 }
 
@@ -327,8 +360,9 @@ int main(int argc, char *argv[])
 	{
 		print_header();
 
-		char*** L_argList = read_input();
-		print_L_argList(L_argList);
+		char cmd[256]; //store cmd in main
+		char*** L_argList = read_input(cmd);
+		//print_L_argList(L_argList);
 
 		if(L_argList)
 		{
@@ -344,7 +378,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		//free_mem(L_argList);
+		//free_L_argList(L_argList);
 	}
 
 	return 0;
