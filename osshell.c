@@ -16,19 +16,54 @@ typedef struct jobs {
 } Jobs;
 
 char cwd[PATH_MAX+1];
+Jobs** jobList;
 
-int create_jobs(char cmd[], pid_t* pidList)
+
+Jobs* create_jobs(char cmd[], pid_t* pidList)
 {
 	Jobs* newNode = malloc(sizeof(Jobs));
 	strcpy(newNode->cmd,cmd);
 	newNode->pidList = pidList;
 	newNode->next = NULL;
+	return newNode;
+}
+
+int add_jobs(char cmd[], pid_t* pidList)
+{
+	if(*jobList == NULL) // first job
+	{
+		*jobList = create_jobs(cmd, pidList);
+	}
+	else
+	{
+		Jobs* temp;
+		for(temp = *jobList; temp->next != NULL; temp=temp->next);
+		temp->next = create_jobs(cmd,pidList);
+	}
 	return 0;
 }
 
-int add_jobs(Jobs** jobList, char cmd[], pid_t* pidList)
+int rm_jobs(int job_no)
 {
+	if(job_no == 1)
+	{
+		Jobs* oldHead = *jobList;
+		*jobList = oldHead->next;
+		free(oldHead->pidList);
+		free(oldHead);
+		return 0;
+	}
 	
+	int i;
+	Jobs* temp = *jobList;
+	for(i = 1;(temp !=NULL && i < job_no-1); i++, temp=temp->next);
+	if(temp->next != NULL) {
+		Jobs* delPtr = temp->next;
+		temp->next = temp->next->next;
+		free(delPtr-> pidList);
+		free(delPtr);
+	}
+	return 0;
 }
 
 int free_L_argList(char*** L_argList)
@@ -51,6 +86,63 @@ int print_header()
 		return -1;
 
 	printf("[3150 shell:%s]$ ",cwd);
+	return 0;
+}
+
+
+int wait_child(pid_t* child_pid, char cmd[], int num)
+{
+	int j;
+	for(j=0;j<num;j++)
+	{
+		int child_status;
+		waitpid(-1,&child_status,WUNTRACED);
+
+		//detect child signal that causes termination
+		if(WIFSIGNALED(child_status)) // ctrl-c
+		{
+			printf("\n");
+			break;
+		}
+		
+		if(WIFSTOPPED(child_status)) //ctrl-z
+		{
+			add_jobs(cmd,child_pid);
+			break;
+		}
+	}
+
+
+	return 0;
+}
+
+int wake_child(int job_no)
+{
+	Jobs* temp = *jobList;
+
+	char cmd[255];
+
+	int i = 1;
+	while(i<job_no)
+	{
+		temp = temp->next;
+		i++;
+	}
+
+	strcpy(cmd,temp->cmd);
+
+	printf("!!%s\n", cmd);
+
+	pid_t* pidList = temp->pidList;
+	for(i=0;pidList[i] != -1 ;i++)
+	{
+		kill(pidList[i],SIGCONT);
+	}
+
+	rm_jobs(job_no);
+	wait_child(pidList, cmd, i);
+
+	
 	return 0;
 }
 
@@ -93,7 +185,31 @@ int check_builtin(char*** L_argList)
 		
 		free_L_argList(L_argList);
 		return 1;
+	}
 
+	if(strcmp(argList[0],"jobs") == 0)
+	{
+		int i = 1;
+		Jobs* temp = *jobList;
+		if(temp == NULL)
+			printf("No Suspended jobs\n");
+		else
+		{
+			while(temp != NULL)
+			{
+				printf("[%d] %s\n",i, temp->cmd);
+				temp = temp->next;
+				i++;
+			}
+		}
+		return 1;
+	}
+
+	if(strcmp(argList[0],"fg") == 0)
+	{
+		int job_no = atoi(argList[1]);
+		wake_child(job_no);
+		return 1;
 	}
 
 	return 0; //not a builtin function
@@ -116,8 +232,11 @@ char*** read_input(char cmd[])
 		return NULL;
 	}
 	
+	char cmd_copy[255];
+	strcpy(cmd_copy,cmd);
 
 	cmd[strlen(cmd)-1] = '\0';
+	cmd_copy[strlen(cmd_copy)-1] = '\0';
 
 	//tokenize
 	int max_arg = 128; //255/2
@@ -127,13 +246,12 @@ char*** read_input(char cmd[])
 	L_argList[i] = malloc(sizeof(char*) * (max_arg+1));
 
 
-	char *token = strtok(cmd," ");
+	char *token = strtok(cmd_copy," ");
 	int arg = 0;
 	while(token != NULL)
 	{
 		if((token[0] == '|') && (token[1] == '\0')) // the pipe character must be separated by spaces
 		{
-			printf("pipe!\n");
 			L_argList[i][arg] = NULL;
 			arg = 0;
 			i++;
@@ -206,7 +324,6 @@ int execution(char*** L_argList, int p_num, int stdout_copy)
 	//if error
 	if (!isatty(fileno(stdout))) //reset stdout to screen
 	{
-		printf("hihihi\n");
 		dup2(stdout_copy,1);
 	}
 	
@@ -219,30 +336,18 @@ int execution(char*** L_argList, int p_num, int stdout_copy)
 	exit(0);
 }
 
-int single_cmd(char*** L_argList)
+
+int single_cmd(char*** L_argList, char cmd[])
 {
-	pid_t child_pid;
-	if((child_pid = fork()))
+	pid_t* child_pid = malloc(sizeof(pid_t)*128);
+
+	if((child_pid[0] = fork()))
 	{
 		//parent
-		int child_status;
-		waitpid(child_pid, &child_status,WUNTRACED);
-
-		//detect child signal that causes termination
-		if(WIFSIGNALED(child_status)) // ctrl-c
-			printf("\n");
-
-		if(WIFSTOPPED(child_status))
-		{
-			printf("\nWake it up?\n");
-			while(getchar() != 'y');
-			printf("Waking up cat YEAH\n");
-			kill(child_pid,SIGCONT);
-			waitpid(child_pid,NULL,WUNTRACED);
-			printf("end\n");
-		}
-
-		free_L_argList(L_argList);
+		child_pid[1] = -1;
+		wait_child(child_pid, cmd, 1);
+		if(L_argList)
+			free_L_argList(L_argList);
 	}
 	else
 	{
@@ -289,17 +394,15 @@ int manage_pipes(int fd[][2], int p, int num)
 	return 0;
 }
 
-int pipe_cmd(char*** L_argList)
+int pipe_cmd(char*** L_argList, char cmd[])
 {
 	int stdout_copy = dup(1); //save a copy of stdout
-
 
 	int num = 0;
 	while(L_argList[num]) //calculate no. of programs
 	{
 		num++;
 	}
-	printf("++%d\n", num);
 
 	//create an array of pipes
 	int pipefd[num-1][2]; //0 to (num-2) pipes
@@ -308,13 +411,13 @@ int pipe_cmd(char*** L_argList)
 		pipe(pipefd[k]);
 
 	int i;
-	int result[num];
+	pid_t* child_pid = malloc(sizeof(pid_t) * num);
+
 	for(i=0;i<num;i++)
 	{		
-		if(!(result[i] = fork()))
+		if(!(child_pid[i] = fork()))
 		{
 			//child
-			printf("  child: %d is created\n", getpid());
 			manage_pipes(pipefd,i,num); //all children will be handled
 
 			execution(L_argList,i,stdout_copy);
@@ -324,21 +427,12 @@ int pipe_cmd(char*** L_argList)
 		else
 		{
 			//parent
-			
-			if(i == 0) // only run for first time
-				printf("  parent: %d\n", getpid());	
-
-			else if(i == num - 1)
+			if(i == num - 1)
 			{
 				//close all pipes
 				manage_pipes(pipefd,num,num);
-
-				int j;
-				for(j=0;j<num;j++)
-				{
-					waitpid(-1,NULL,0);
-					printf("  process %d terminated\n", j);
-				}
+				child_pid[i+1] = -1;
+				wait_child(child_pid,cmd,num);
     		}
 
 		}
@@ -351,10 +445,12 @@ int pipe_cmd(char*** L_argList)
 
 int main(int argc, char *argv[])
 {
-	//signal(SIGINT, SIG_IGN); // ctrl-c
-	signal(SIGTERM, SIG_IGN); // kill
+	signal(SIGINT, SIG_IGN); // ctrl-c
+	//signal(SIGTERM, SIG_IGN); // kill
 	signal(SIGQUIT, SIG_IGN); // ctrl- backslash
 	signal(SIGTSTP, SIG_IGN); // ctrl-z
+
+	jobList = malloc(sizeof(Jobs*));
 
 	while(1)
 	{
@@ -369,12 +465,11 @@ int main(int argc, char *argv[])
 			if(L_argList[1] == NULL) //single_cmd
 			{
 				if(check_builtin(L_argList) == 0)
-					single_cmd(L_argList);
+					single_cmd(L_argList, cmd);
 			}
 			else //pipe
 			{
-				printf("pipe!\n");
-				pipe_cmd(L_argList);
+				pipe_cmd(L_argList,cmd);
 			}
 		}
 		
