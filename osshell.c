@@ -99,7 +99,7 @@ int wait_child(pid_t* child_pid, char cmd[], int num)
 	{
 		printf("--%d\n", j);
 		int child_status;
-		waitpid(-1,&child_status,WUNTRACED);
+		waitpid(child_pid[j],&child_status,WUNTRACED);
 
 		//detect child signal that causes termination
 		if(WIFSIGNALED(child_status)) // ctrl-c
