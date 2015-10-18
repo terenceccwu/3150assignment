@@ -111,7 +111,7 @@ char*** read_input()
 	int arg = 0;
 	while(token != NULL)
 	{
-		if((token[0] == '|'))
+		if((token[0] == '|') && (token[1] == '\0')) // the pipe character must be separated by spaces
 		{
 			printf("pipe!\n");
 			L_argList[i][arg] = NULL;
@@ -162,13 +162,16 @@ int print_L_argList(char*** L_argList)
 		printf("program %d\n", i);
 		int j = 0;
 		while(L_argList[i][j])
-			printf("  arg[%d] = %s\n", j, L_argList[i][j++]);
+		{
+			printf("  arg[%d] = %s\n", j, L_argList[i][j]);
+			j++;
+		}
 		i++;
 	}
 	return 0;
 }
 
-int execution(char*** L_argList, int p_num)
+int execution(char*** L_argList, int p_num, int stdout_copy)
 {
 	char** argList = L_argList[p_num];
 
@@ -179,6 +182,14 @@ int execution(char*** L_argList, int p_num)
 
 	setenv("PATH","/bin:/usr/bin:.",1);
 	execvp(*argList,argList);
+
+	//if error
+	if (!isatty(fileno(stdout))) //reset stdout to screen
+	{
+		printf("hihihi\n");
+		dup2(stdout_copy,1);
+	}
+	
 	if(errno == ENOENT){
 		printf("%s: command not found\n", argList[0]);
 	} else {
@@ -206,7 +217,7 @@ int single_cmd(char*** L_argList)
 	else
 	{
 		//child
-		execution(L_argList,0);
+		execution(L_argList,0,0);
 	}
 	return 0;
 }
@@ -250,6 +261,9 @@ int manage_pipes(int fd[][2], int p, int num)
 
 int pipe_cmd(char*** L_argList)
 {
+	int stdout_copy = dup(1); //save a copy of stdout
+
+
 	int num = 0;
 	while(L_argList[num]) //calculate no. of programs
 	{
@@ -263,10 +277,6 @@ int pipe_cmd(char*** L_argList)
 	for(k=0;k<num-1;k++)
 		pipe(pipefd[k]);
 
-	//save a copy of stdin & stdout
-	int stdin_copy = dup(0);
-	int stdout_copy = dup(1);
-
 	int i;
 	int result[num];
 	for(i=0;i<num;i++)
@@ -277,17 +287,7 @@ int pipe_cmd(char*** L_argList)
 			printf("  child: %d is created\n", getpid());
 			manage_pipes(pipefd,i,num); //all children will be handled
 
-			setenv("PATH","/bin:/usr/bin:.",1);
-			execvp(*L_argList[i], L_argList[i]);
-			//if error
-			dup2(stdout_copy,1); //reset stdout to screen
-
-			if(errno == ENOENT){
-				printf("%s: command not found\n", L_argList[i][0]);
-			} else {
-				printf("%s: unknown error\n", L_argList[i][0]);
-			}
-			exit(0);
+			execution(L_argList,i,stdout_copy);
 
 			break; //child does not loop
 		}
