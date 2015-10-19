@@ -6,16 +6,17 @@ int main()
 	while((c = getchar()))
 	{
 		if(c == EOF)
-			break;			
-		if(c >= 'a' && c<='z')
-			putchar(c - ('a' - 'A'));
-		else if(c == '\n')
+			break;
+		if(c == '\n')
 		{
 			putchar(c);
 			fflush(stdout);
 		}
 		else
+		{
 			putchar(c);
+			putchar('-');
+		}
 	}
 
 	return 0;
