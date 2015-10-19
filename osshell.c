@@ -29,7 +29,6 @@ Jobs* create_jobs(char cmd[], pid_t* pidList)
 
 int add_jobs(char cmd[], pid_t* pidList)
 {
-	printf("error!\n");
 	if(*jobList == NULL) // first job
 	{
 		*jobList = create_jobs(cmd, pidList);
@@ -47,7 +46,6 @@ int rm_jobs(int job_no)
 {
 	if(job_no == 1)
 	{
-		printf("success\n");
 		Jobs* oldHead = *jobList;
 		*jobList = oldHead->next;
 
@@ -98,10 +96,9 @@ int wait_child(pid_t* child_pid, char cmd[], int num)
 	int j;
 	for(j=0;j<num;j++)
 	{
-		printf("--%d\n", j);
 		int child_status = 0;
 		waitpid(child_pid[j],&child_status,WUNTRACED);
-		printf("!!%d\n", j);
+
 		//detect child signal that causes termination
 		if(WIFSIGNALED(child_status)) // ctrl-c
 		{
@@ -122,7 +119,7 @@ int wait_child(pid_t* child_pid, char cmd[], int num)
 		if(WIFEXITED(child_status))
 		{
 			if(j == num -1)
-				printf("!exited\n");
+				free(child_pid);
 		}
 	}
 
@@ -146,19 +143,14 @@ int wake_child(int job_no)
 
 	strcpy(cmd,temp->cmd);
 
-	printf("!!%s\n", cmd);
-
 	pid_t* pidList = temp->pidList;
 
 	for(i=0; pidList[i] != 0 ;i++)
 	{
-		printf("%d\n", pidList[i]);
 		kill(pidList[i],SIGCONT);
 	}
-	printf("before hihihi\n");
 
 	rm_jobs(job_no);
-	printf("hihihi\n");
 	wait_child(pidList, cmd, i);
 
 	
@@ -216,7 +208,6 @@ int check_builtin(char*** L_argList)
 		}
 		else
 		{
-			printf("have jobs\n");
 			while(temp != NULL)
 			{
 				printf("[%d] %s\n",i, temp->cmd);
@@ -224,8 +215,6 @@ int check_builtin(char*** L_argList)
 				i++;
 			}
 		}
-		printf("before\n");
-
 		return 1;
 	}
 
@@ -244,7 +233,6 @@ int check_builtin(char*** L_argList)
 			num++;
 		}
 
-		printf("%d, %d\n", job_no, num);
 		if(job_no > 0 && job_no <= num)
 			wake_child(job_no);
 		else
@@ -265,7 +253,6 @@ char*** read_input(char cmd[])
 		printf("\n");
 		exit(0);
 	}
-	printf("pass\n");
 
 	if(strlen(cmd) == 1 || cmd[0] == ' ')
 	{
