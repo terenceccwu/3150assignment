@@ -18,10 +18,9 @@ typedef struct jobs {
 char cwd[PATH_MAX+1];
 Jobs** jobList;
 
-
 Jobs* create_jobs(char cmd[], pid_t* pidList)
 {
-	Jobs* newNode = malloc(sizeof(Jobs));
+	Jobs* newNode = (Jobs*)malloc(sizeof(Jobs));
 	strcpy(newNode->cmd,cmd);
 	newNode->pidList = pidList;
 	newNode->next = NULL;
@@ -30,6 +29,7 @@ Jobs* create_jobs(char cmd[], pid_t* pidList)
 
 int add_jobs(char cmd[], pid_t* pidList)
 {
+	printf("error!\n");
 	if(*jobList == NULL) // first job
 	{
 		*jobList = create_jobs(cmd, pidList);
@@ -99,9 +99,9 @@ int wait_child(pid_t* child_pid, char cmd[], int num)
 	for(j=0;j<num;j++)
 	{
 		printf("--%d\n", j);
-		int child_status;
+		int child_status = 0;
 		waitpid(child_pid[j],&child_status,WUNTRACED);
-
+		printf("!!%d\n", j);
 		//detect child signal that causes termination
 		if(WIFSIGNALED(child_status)) // ctrl-c
 		{
@@ -211,9 +211,12 @@ int check_builtin(char*** L_argList)
 		int i = 1;
 		Jobs* temp = *jobList;
 		if(temp == NULL)
+		{
 			printf("No Suspended jobs\n");
+		}
 		else
 		{
+			printf("have jobs\n");
 			while(temp != NULL)
 			{
 				printf("[%d] %s\n",i, temp->cmd);
@@ -221,6 +224,8 @@ int check_builtin(char*** L_argList)
 				i++;
 			}
 		}
+		printf("before\n");
+
 		return 1;
 	}
 
@@ -260,13 +265,13 @@ char*** read_input(char cmd[])
 		printf("\n");
 		exit(0);
 	}
+	printf("pass\n");
 
 	if(strlen(cmd) == 1 || cmd[0] == ' ')
 	{
 		//empty string OR a space is read
 		return NULL;
 	}
-	
 	char cmd_copy[255];
 	strcpy(cmd_copy,cmd);
 
@@ -275,10 +280,11 @@ char*** read_input(char cmd[])
 
 	//tokenize
 	int max_arg = 128; //255/2
-	char*** L_argList = malloc(sizeof(char**) * (max_arg+1)); // +1 for the final NULL char
+
+	char*** L_argList = (char***)malloc(sizeof(char**) * (max_arg+1)); // +1 for the final NULL char
 
 	int i = 0;
-	L_argList[i] = malloc(sizeof(char*) * (max_arg+1));
+	L_argList[i] = (char**)malloc(sizeof(char*) * (max_arg+1));
 
 
 	char *token = strtok(cmd_copy," ");
@@ -290,7 +296,7 @@ char*** read_input(char cmd[])
 			L_argList[i][arg] = NULL;
 			arg = 0;
 			i++;
-			L_argList[i] = malloc(sizeof(char*) * (max_arg+1));
+			L_argList[i] = (char**)malloc(sizeof(char*) * (max_arg+1));
 			token = strtok(NULL," ");
 			continue;
 		}
@@ -374,7 +380,7 @@ int execution(char*** L_argList, int p_num, int stdout_copy)
 
 int single_cmd(char*** L_argList, char cmd[])
 {
-	pid_t* child_pid = malloc(sizeof(pid_t)*3);
+	pid_t* child_pid = (pid_t*)malloc(sizeof(pid_t)*3);
 
 	if((child_pid[0] = fork()))
 	{
@@ -449,7 +455,7 @@ int pipe_cmd(char*** L_argList, char cmd[])
 		pipe(pipefd[k]);
 
 	int i;
-	pid_t* child_pid = malloc(sizeof(pid_t) * (num+1));
+	pid_t* child_pid = (pid_t*)malloc(sizeof(pid_t) * (num+1));
 
 	for(i=0;i<num;i++)
 	{		
@@ -489,16 +495,19 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, SIG_IGN); // ctrl- backslash
 	signal(SIGTSTP, SIG_IGN); // ctrl-z
 
-	jobList = malloc(sizeof(Jobs*));
+	jobList = (Jobs**)malloc(sizeof(Jobs*));
+	*jobList = NULL;
 
 	while(1)
 	{
 		print_header();
-
+		
 		char cmd[256]; //store cmd in main
+
 		char*** L_argList = read_input(cmd);
+
 		//print_L_argList(L_argList);
-		printf("readed\n");
+
 		if(L_argList)
 		{
 			if(L_argList[1] == NULL) //single_cmd
