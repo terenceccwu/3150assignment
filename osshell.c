@@ -478,7 +478,7 @@ int pipe_cmd(char*** L_argList, char cmd[])
 int main(int argc, char *argv[])
 {
 	signal(SIGINT, SIG_IGN); // ctrl-c
-	//signal(SIGTERM, SIG_IGN); // kill
+	signal(SIGTERM, SIG_IGN); // kill
 	signal(SIGQUIT, SIG_IGN); // ctrl- backslash
 	signal(SIGTSTP, SIG_IGN); // ctrl-z
 
